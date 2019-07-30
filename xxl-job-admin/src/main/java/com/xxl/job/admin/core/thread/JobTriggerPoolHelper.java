@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * job trigger thread pool helper
+ *  任务执行线程池  帮助类
  *
  * @author xuxueli 2018-07-03 21:08:07
  */
@@ -48,7 +49,10 @@ public class JobTriggerPoolHelper {
 
 
     // job timeout count
-    private volatile long minTim = System.currentTimeMillis()/60000;     // ms > min
+    private volatile long minTim = System.currentTimeMillis()/60000;     // ms > min   转换成分钟
+
+
+    // 调度超时 次数统计
     private volatile ConcurrentMap<Integer, AtomicInteger> jobTimeoutCountMap = new ConcurrentHashMap<>();
 
 
@@ -60,8 +64,12 @@ public class JobTriggerPoolHelper {
         // choose thread pool
         ThreadPoolExecutor triggerPool_ = fastTriggerPool;
         AtomicInteger jobTimeoutCount = jobTimeoutCountMap.get(jobId);
+
+
+
+
         if (jobTimeoutCount!=null && jobTimeoutCount.get() > 10) {      // job-timeout 10 times in 1 min
-            triggerPool_ = slowTriggerPool;
+            triggerPool_ = slowTriggerPool;  // 这边也说了  ，一分钟内超时10次的就切换成  慢的
         }
 
         // trigger
@@ -78,7 +86,7 @@ public class JobTriggerPoolHelper {
                     logger.error(e.getMessage(), e);
                 } finally {
 
-                    // check timeout-count-map
+                    // check timeout-count-map  一分钟清理一次
                     long minTim_now = System.currentTimeMillis()/60000;
                     if (minTim != minTim_now) {
                         minTim = minTim_now;
@@ -107,14 +115,14 @@ public class JobTriggerPoolHelper {
         logger.info(">>>>>>>>> xxl-job trigger thread pool shutdown success.");
     }
 
-    // ---------------------- helper ----------------------
+    // ---------------------- helper   ----------------------
 
     private static JobTriggerPoolHelper helper = new JobTriggerPoolHelper();
 
     /**
-     * @param jobId
-     * @param triggerType
-     * @param failRetryCount
+     * @param jobId   任务 ID
+     * @param triggerType  调度类型
+     * @param failRetryCount   失败重试次数
      * 			>=0: use this param
      * 			<0: use param from job info config
      * @param executorShardingParam

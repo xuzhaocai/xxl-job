@@ -29,17 +29,25 @@ import java.util.Map;
 
 /**
  * index controller
+ * 主要是关于job 的一些api
  * @author xuxueli 2015-12-19 16:13:16
  */
 @Controller
 @RequestMapping("/jobinfo")
 public class JobInfoController {
-
+	//
 	@Resource
 	private XxlJobGroupDao xxlJobGroupDao;
 	@Resource
 	private XxlJobService xxlJobService;
-	
+
+	/**
+	 * 获取任务列表
+	 * @param request
+	 * @param model
+	 * @param jobGroup
+	 * @return
+	 */
 	@RequestMapping
 	public String index(HttpServletRequest request, Model model, @RequestParam(required = false, defaultValue = "-1") int jobGroup) {
 
@@ -137,7 +145,14 @@ public class JobInfoController {
 		if (executorParam == null) {
 			executorParam = "";
 		}
-
+		/**
+		 *  id  任务ID
+		 *  调度类型
+		 *  重试次数
+		 *  执行器共享参数
+		 *  执行参数
+		 *
+		 */
 		JobTriggerPoolHelper.trigger(id, TriggerTypeEnum.MANUAL, -1, null, executorParam);
 		return ReturnT.SUCCESS;
 	}

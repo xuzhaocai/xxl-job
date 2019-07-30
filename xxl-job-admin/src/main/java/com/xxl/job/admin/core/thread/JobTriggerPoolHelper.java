@@ -80,7 +80,7 @@ public class JobTriggerPoolHelper {
                 long start = System.currentTimeMillis();
 
                 try {
-                    // do trigger
+                    // do trigger  真正的触发工作
                     XxlJobTrigger.trigger(jobId, triggerType, failRetryCount, executorShardingParam, executorParam);
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);

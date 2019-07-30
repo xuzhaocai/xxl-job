@@ -64,7 +64,7 @@ public class TriggerCallbackThread {
                         HandleCallbackParam callback = getInstance().callBackQueue.take();
                         if (callback != null) {
 
-                            // callback list param
+                            // callback list param  // 批量获取一下下
                             List<HandleCallbackParam> callbackParamList = new ArrayList<HandleCallbackParam>();
                             int drainToNum = getInstance().callBackQueue.drainTo(callbackParamList);
                             callbackParamList.add(callback);
@@ -81,7 +81,7 @@ public class TriggerCallbackThread {
                     }
                 }
 
-                // last callback
+                // last callback  如果是停了 ，也要把剩余的处理完
                 try {
                     List<HandleCallbackParam> callbackParamList = new ArrayList<HandleCallbackParam>();
                     int drainToNum = getInstance().callBackQueue.drainTo(callbackParamList);
@@ -161,7 +161,7 @@ public class TriggerCallbackThread {
     private void doCallback(List<HandleCallbackParam> callbackParamList){
         boolean callbackRet = false;
         // callback, will retry if error
-        for (AdminBiz adminBiz: XxlJobExecutor.getAdminBizList()) {
+        for (AdminBiz adminBiz: XxlJobExecutor.getAdminBizList()) {   // 有一个成功就行了
             try {
                 ReturnT<String> callbackResult = adminBiz.callback(callbackParamList);
                 if (callbackResult!=null && ReturnT.SUCCESS_CODE == callbackResult.getCode()) {

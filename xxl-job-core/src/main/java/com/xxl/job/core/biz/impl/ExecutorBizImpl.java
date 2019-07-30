@@ -20,6 +20,7 @@ import java.util.Date;
 
 /**
  * Created by xuxueli on 17/3/1.
+ * 真正的执行类  rpc 里面的服务提供方
  */
 public class ExecutorBizImpl implements ExecutorBiz {
     private static Logger logger = LoggerFactory.getLogger(ExecutorBizImpl.class);
@@ -65,22 +66,25 @@ public class ExecutorBizImpl implements ExecutorBiz {
         LogResult logResult = XxlJobFileAppender.readLog(logFileName, fromLineNum);
         return new ReturnT<LogResult>(logResult);
     }
-
+    // 任务调度方法
     @Override
     public ReturnT<String> run(TriggerParam triggerParam) {
         // load old：jobHandler + jobThread
+
+
+
         JobThread jobThread = XxlJobExecutor.loadJobThread(triggerParam.getJobId());
         IJobHandler jobHandler = jobThread!=null?jobThread.getHandler():null;
         String removeOldReason = null;
 
         // valid：jobHandler + jobThread
         GlueTypeEnum glueTypeEnum = GlueTypeEnum.match(triggerParam.getGlueType());
-        if (GlueTypeEnum.BEAN == glueTypeEnum) {
+        if (GlueTypeEnum.BEAN == glueTypeEnum) {   // bean 的形式， 也是比较常用的
 
-            // new jobhandler
+            // new jobhandler  获取到任务的 执行器bean
             IJobHandler newJobHandler = XxlJobExecutor.loadJobHandler(triggerParam.getExecutorHandler());
 
-            // valid old jobThread
+            // valid old jobThread   处理掉老的执行器
             if (jobThread!=null && jobHandler != newJobHandler) {
                 // change handler, need kill old thread
                 removeOldReason = "change jobhandler or glue type, and terminate the old job thread.";
@@ -90,7 +94,7 @@ public class ExecutorBizImpl implements ExecutorBiz {
             }
 
             // valid handler
-            if (jobHandler == null) {
+            if (jobHandler == null) {   // 赋值新的handler
                 jobHandler = newJobHandler;
                 if (jobHandler == null) {
                     return new ReturnT<String>(ReturnT.FAIL_CODE, "job handler [" + triggerParam.getExecutorHandler() + "] not found.");

@@ -21,10 +21,10 @@ public class XxlJobSpringExecutor extends XxlJobExecutor implements ApplicationC
     @Override
     public void start() throws Exception {
 
-        // init JobHandler Repository
+        // init JobHandler Repository   主要是找的 带有JobHandler 注解的，然后将这些handler 缓存起来
         initJobHandlerRepository(applicationContext);
 
-        // refresh GlueFactory
+        // refresh GlueFactory   创建 Glue 的 时候使用spring的 那个
         GlueFactory.refreshInstance(1);
 
 
@@ -37,7 +37,7 @@ public class XxlJobSpringExecutor extends XxlJobExecutor implements ApplicationC
             return;
         }
 
-        // init job handler action
+        // init job handler action  获取 带有 JobHandler  注解的 handler
         Map<String, Object> serviceBeanMap = applicationContext.getBeansWithAnnotation(JobHandler.class);
 
         if (serviceBeanMap!=null && serviceBeanMap.size()>0) {

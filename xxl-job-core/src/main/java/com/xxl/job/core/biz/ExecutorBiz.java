@@ -40,7 +40,7 @@ public interface ExecutorBiz {
     public ReturnT<LogResult> log(long logDateTim, long logId, int fromLineNum);
 
     /**
-     * run
+     * run  调度的方法
      * @param triggerParam
      * @return
      */

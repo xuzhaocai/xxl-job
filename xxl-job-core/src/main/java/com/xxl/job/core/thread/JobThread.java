@@ -28,6 +28,8 @@ public class JobThread extends Thread{
 	private static Logger logger = LoggerFactory.getLogger(JobThread.class);
 
 	private int jobId;
+
+	// handler  就是咱们加注解的那个bean
 	private IJobHandler handler;
 	private LinkedBlockingQueue<TriggerParam> triggerQueue;
 	private Set<Long> triggerLogIdSet;		// avoid repeat trigger for the same TRIGGER_LOG_ID
@@ -89,7 +91,7 @@ public class JobThread extends Thread{
     public boolean isRunningOrHasQueue() {
         return running || triggerQueue.size()>0;
     }
-
+	// 真正的执行方法
     @Override
 	public void run() {
 
@@ -123,10 +125,13 @@ public class JobThread extends Thread{
 					// execute
 					XxlJobLogger.log("<br>----------- xxl-job job execute start -----------<br>----------- Param:" + triggerParam.getExecutorParams());
 
-					if (triggerParam.getExecutorTimeout() > 0) {
+					if (triggerParam.getExecutorTimeout() > 0) {  // 带有超时时间的
 						// limit timeout
 						Thread futureThread = null;
 						try {
+
+
+							/// 使用异步来执行， 利用FutureTask 类的超时方法来搞的
 							final TriggerParam triggerParamTmp = triggerParam;
 							FutureTask<ReturnT<String>> futureTask = new FutureTask<ReturnT<String>>(new Callable<ReturnT<String>>() {
 								@Override
@@ -152,8 +157,8 @@ public class JobThread extends Thread{
 						executeResult = handler.execute(triggerParam.getExecutorParams());
 					}
 
-					if (executeResult == null) {
-						executeResult = IJobHandler.FAIL;
+					if (executeResult == null) {  // 执行结果是null的
+						executeResult = IJobHandler.FAIL;    //赋值失败
 					} else {
 						executeResult.setMsg(
 								(executeResult!=null&&executeResult.getMsg()!=null&&executeResult.getMsg().length()>50000)
@@ -164,7 +169,7 @@ public class JobThread extends Thread{
 					XxlJobLogger.log("<br>----------- xxl-job job execute end(finish) -----------<br>----------- ReturnT:" + executeResult);
 
 				} else {
-					if (idleTimes > 30) {
+					if (idleTimes > 30) {  // 空闲30次就要移除这个线程了
 						XxlJobExecutor.removeJobThread(jobId, "excutor idel times over limit.");
 					}
 				}

@@ -116,13 +116,17 @@ public class XxlJobScheduler implements InitializingBean, DisposableBean {
 
     // ---------------------- executor-client ----------------------
     private static ConcurrentMap<String, ExecutorBiz> executorBizRepository = new ConcurrentHashMap<String, ExecutorBiz>();
+
+
+
+    ///  生成一个rpc 代理对象  ，这里使用的xxl-rpc
     public static ExecutorBiz getExecutorBiz(String address) throws Exception {
         // valid
         if (address==null || address.trim().length()==0) {
             return null;
         }
 
-        // load-cache
+        // load-cache  缓存这个客户端
         address = address.trim();
         ExecutorBiz executorBiz = executorBizRepository.get(address);
         if (executorBiz != null) {
@@ -131,13 +135,13 @@ public class XxlJobScheduler implements InitializingBean, DisposableBean {
 
         // set-cache
         executorBiz = (ExecutorBiz) new XxlRpcReferenceBean(
-                NetEnum.NETTY_HTTP,
-                Serializer.SerializeEnum.HESSIAN.getSerializer(),
+                NetEnum.NETTY_HTTP,   // 使用netty http的方式
+                Serializer.SerializeEnum.HESSIAN.getSerializer(),  //hession序列化
                 CallType.SYNC,
                 LoadBalance.ROUND,
                 ExecutorBiz.class,
                 null,
-                3000,
+                3000,  // 3s
                 address,
                 XxlJobAdminConfig.getAdminConfig().getAccessToken(),
                 null,

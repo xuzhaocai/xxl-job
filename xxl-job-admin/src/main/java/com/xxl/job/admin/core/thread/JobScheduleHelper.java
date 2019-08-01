@@ -34,8 +34,8 @@ public class JobScheduleHelper {
     private volatile static Map<Integer, List<Integer>> ringData = new ConcurrentHashMap<>();
 
     public void start(){
-
-        // schedule thread
+        // 刷 数据库的线程
+        // schedule thread  调度线程
         scheduleThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -52,16 +52,18 @@ public class JobScheduleHelper {
                 Connection conn = null;
                 while (!scheduleThreadToStop) {
 
-                    // Scan Job
+                    // Scan Job  扫描任务
                     long start = System.currentTimeMillis();
                     PreparedStatement preparedStatement = null;
                     boolean preReadSuc = true;
                     try {
-                        if (conn==null || conn.isClosed()) {
+                        if (conn==null || conn.isClosed()) {  // 数据库连接处理
                             conn = XxlJobAdminConfig.getAdminConfig().getDataSource().getConnection();
                         }
-                        conn.setAutoCommit(false);
 
+                        // 关闭事务的自动提交
+                        conn.setAutoCommit(false);
+                        // 数据库的悲观锁   ， 保证数据的幂等性
                         preparedStatement = conn.prepareStatement(  "select * from xxl_job_lock where lock_name = 'schedule_lock' for update" );
                         preparedStatement.execute();
 
@@ -75,7 +77,7 @@ public class JobScheduleHelper {
                             for (XxlJobInfo jobInfo: scheduleList) {
 
                                 // 时间轮刻度计算
-                                if (nowTime > jobInfo.getTriggerNextTime() + PRE_READ_MS) {
+                                if (nowTime > jobInfo.getTriggerNextTime() + PRE_READ_MS) { // 调度时间超了5s 就放弃了  ，然后计算好下次的调度时间
                                     // 过期超5s：本地忽略，当前时间开始计算下次触发时间
 
                                     // fresh next
@@ -95,7 +97,7 @@ public class JobScheduleHelper {
                                     CronExpression cronExpression = new CronExpression(jobInfo.getJobCron());
                                     long nextTime = cronExpression.getNextValidTimeAfter(new Date()).getTime();
 
-                                    // 1、trigger
+                                    // 1、trigger  立即触发一次
                                     JobTriggerPoolHelper.trigger(jobInfo.getId(), TriggerTypeEnum.CRON, -1, null, null);
                                     logger.debug(">>>>>>>>>>> xxl-job, shecule push trigger : jobId = " + jobInfo.getId() );
 
@@ -105,15 +107,15 @@ public class JobScheduleHelper {
 
 
                                     // 下次5s内：预读一次；
-                                    if (jobInfo.getTriggerNextTime() - nowTime < PRE_READ_MS) {
+                                    if (jobInfo.getTriggerNextTime() - nowTime < PRE_READ_MS) {  // 距离下次调度 还有不到5s  就搞到 ring 上面
 
                                         // 1、make ring second
                                         int ringSecond = (int)((jobInfo.getTriggerNextTime()/1000)%60);
 
                                         // 2、push time ring
-                                        pushTimeRing(ringSecond, jobInfo.getId());
+                                        pushTimeRing(ringSecond, jobInfo.getId());// 放到环中
 
-                                        // 3、fresh next
+                                        // 3、fresh next  计算出下下次的调度时间
                                         Date nextValidTime = new CronExpression(jobInfo.getJobCron()).getNextValidTimeAfter(new Date(jobInfo.getTriggerNextTime()));
                                         if (nextValidTime != null) {
                                             jobInfo.setTriggerLastTime(jobInfo.getTriggerNextTime());
@@ -132,10 +134,10 @@ public class JobScheduleHelper {
                                     // 1、make ring second
                                     int ringSecond = (int)((jobInfo.getTriggerNextTime()/1000)%60);
 
-                                    // 2、push time ring
+                                    // 2、push time ring  没有过期 就要放到时间刻度环上
                                     pushTimeRing(ringSecond, jobInfo.getId());
 
-                                    // 3、fresh next
+                                    // 3、fresh next  计算出下一次 ，然后进行设置
                                     Date nextValidTime = new CronExpression(jobInfo.getJobCron()).getNextValidTimeAfter(new Date(jobInfo.getTriggerNextTime()));
                                     if (nextValidTime != null) {
                                         jobInfo.setTriggerLastTime(jobInfo.getTriggerNextTime());
@@ -150,7 +152,7 @@ public class JobScheduleHelper {
 
                             }
 
-                            // 3、更新trigger信息
+                            // 3、更新trigger信息    将下次调度时间放到数据库中
                             for (XxlJobInfo jobInfo: scheduleList) {
                                 XxlJobAdminConfig.getAdminConfig().getXxlJobInfoDao().scheduleUpdate(jobInfo);
                             }
@@ -168,7 +170,7 @@ public class JobScheduleHelper {
                         }
                     } finally {
 
-                        // commit
+                        // commit 提交事务
                         try {
                             conn.commit();
                         } catch (SQLException e) {
@@ -194,7 +196,7 @@ public class JobScheduleHelper {
                     // Wait seconds, align second
                     if (cost < 1000) {  // scan-overtime, not wait
                         try {
-                            // pre-read period: success > scan each second; fail > skip this period;
+                            // pre-read period: success > scan each second; fail > skip this period;  比较闲的话就要多等点时间了
                             TimeUnit.MILLISECONDS.sleep((preReadSuc?1000:PRE_READ_MS) - System.currentTimeMillis()%1000);
                         } catch (InterruptedException e) {
                             if (!scheduleThreadToStop) {
@@ -239,7 +241,7 @@ public class JobScheduleHelper {
                         List<Integer> ringItemData = new ArrayList<>();
                         int nowSecond = Calendar.getInstance().get(Calendar.SECOND);   // 避免处理耗时太长，跨过刻度，向前校验一个刻度；
                         for (int i = 0; i < 2; i++) {
-                            List<Integer> tmpData = ringData.remove( (nowSecond+60-i)%60 );
+                            List<Integer> tmpData = ringData.remove( (nowSecond+60-i)%60 );   // 提前处理一个 刻度钟的
                             if (tmpData != null) {
                                 ringItemData.addAll(tmpData);
                             }
@@ -248,7 +250,7 @@ public class JobScheduleHelper {
                         // ring trigger
                         logger.debug(">>>>>>>>>>> xxl-job, time-ring beat : " + nowSecond + " = " + Arrays.asList(ringItemData) );
                         if (ringItemData!=null && ringItemData.size()>0) {
-                            // do trigger
+                            // do trigger   // 进行调度
                             for (int jobId: ringItemData) {
                                 // do trigger
                                 JobTriggerPoolHelper.trigger(jobId, TriggerTypeEnum.CRON, -1, null, null);
@@ -278,9 +280,9 @@ public class JobScheduleHelper {
         ringThread.setName("xxl-job, admin JobScheduleHelper#ringThread");
         ringThread.start();
     }
-
+    // 往时间刻度环上添加任务
     private void pushTimeRing(int ringSecond, int jobId){
-        // push async ring
+        // push async ring   防到 时间刻度环中
         List<Integer> ringItemData = ringData.get(ringSecond);
         if (ringItemData == null) {
             ringItemData = new ArrayList<Integer>();
@@ -290,11 +292,11 @@ public class JobScheduleHelper {
 
         logger.debug(">>>>>>>>>>> xxl-job, shecule push time-ring : " + ringSecond + " = " + Arrays.asList(ringItemData) );
     }
-
+    // 停止
     public void toStop(){
 
         // 1、stop schedule
-        scheduleThreadToStop = true;
+        scheduleThreadToStop = true;  // 这个是直接设置停止标识的
         try {
             TimeUnit.SECONDS.sleep(1);  // wait
         } catch (InterruptedException e) {
@@ -310,7 +312,7 @@ public class JobScheduleHelper {
             }
         }
 
-        // if has ring data
+        // if has ring data   判断时间刻度环上是否还有数据  ，如果有的话 设置标识
         boolean hasRingData = false;
         if (!ringData.isEmpty()) {
             for (int second : ringData.keySet()) {
@@ -321,7 +323,7 @@ public class JobScheduleHelper {
                 }
             }
         }
-        if (hasRingData) {
+        if (hasRingData) {  // 等8 s  再搞
             try {
                 TimeUnit.SECONDS.sleep(8);
             } catch (InterruptedException e) {
@@ -330,7 +332,7 @@ public class JobScheduleHelper {
         }
 
         // stop ring (wait job-in-memory stop)
-        ringThreadToStop = true;
+        ringThreadToStop = true;     // 设置停止标识
         try {
             TimeUnit.SECONDS.sleep(1);
         } catch (InterruptedException e) {

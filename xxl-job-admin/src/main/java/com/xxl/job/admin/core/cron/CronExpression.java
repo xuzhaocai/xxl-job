@@ -198,6 +198,9 @@ import java.util.TreeSet;
  *
  * Borrowed from quartz v2.3.1
  *
+ *
+ *能够解析cron表达式 ，然后获取时间
+ *
  */
 public final class CronExpression implements Serializable, Cloneable {
 
